@@ -1,5 +1,9 @@
 # Budget Project Backend
 
+This is backend for the project.
+<br>
+Frontend - https://github.com/NotShrirang/budget-project-frontend
+
 Clone the project-
 ```
 git clone https://github.com/atharvabhide/budget-project-backend.git
