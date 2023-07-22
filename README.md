@@ -10,10 +10,9 @@ Install dependencies-
 pip install -r requirements.txt
 ```
 
-Create env file-
+Create env file for MySQL credentials-
 ```
 Create a .env file in the project folder with the following fields:
-
 DB_NAME = <db_name>
 DB_USER = <db_user>
 DB_PASSWORD = <db_password>
@@ -26,7 +25,7 @@ Migrate the project-
 python manage.py migrate
 ```
 
-Run local server
+Run local server-
 ```
 python manage.py runserver
 ```
