@@ -10,7 +10,7 @@ Install dependencies-
 pip install -r requirements.txt
 ```
 
-Create env file-
+Create env file for MySQL credentials-
 ```
 Create a .env file in the project folder with the following fields:
 DB_NAME = <db_name>
