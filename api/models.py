@@ -1,6 +1,29 @@
 from django.db import models
-from users.models import CustomUser
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.models import PermissionsMixin
 from uuid import uuid4
+
+class CollegeUserManager(BaseUserManager):
+    def create_user(self, email, username, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Users must have email address")
+        if not username:
+            raise ValueError("Users must have username")
+        
+        user = self.model(
+            email = self.normalize_email(email),
+            username = username,
+            **extra_fields,
+        )
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, username, password=None, **extra_fields):
+        extra_fields.setdefault('is_admin', True)
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, username, password, **extra_fields)
 
 class Department(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -14,18 +37,33 @@ class Department(models.Model):
     class Meta:
         db_table = 'department'
 
-class CollegeUser(CustomUser):
+class CollegeUser(AbstractBaseUser, PermissionsMixin):
     PRIVILEGE_CHOICES = (
         ('superuser', 'Superuser'),
         ('principal', 'Principal'),
         ('hod', 'HOD'),
         ('employee', 'Employee'),
     )
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    email = models.EmailField(verbose_name="email", max_length=60, unique=True)
+    username = models.CharField(max_length=255, unique=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True, related_name='users')
     privilege = models.CharField(max_length=255, choices=PRIVILEGE_CHOICES, default='employee')
+
+    is_active = models.BooleanField(default=True)
+    is_admin = models.BooleanField(default=False)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+
+    objects = CollegeUserManager()
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
+
+    def __str__(self):
+        return self.email
     
     class Meta:
-        db_table = 'user'
+        db_table = 'college_user'
 
 class Activity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
