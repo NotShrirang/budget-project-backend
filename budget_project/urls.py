@@ -7,8 +7,13 @@ class HomeView(APIView):
     def get(self, request):
         return Response({
             "message": "Budget Form Application Project",
-            "admin" : "admin/",
-            "api": "api/",
+            "endpoints": [
+                "/admin/",
+                "/api/college-users/",
+                "/api/departments/",
+                "/api/activities/",
+                "/api/transactions/",
+            ]
         })
 
 urlpatterns = [
