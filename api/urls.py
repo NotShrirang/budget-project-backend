@@ -7,6 +7,9 @@ from api.views import (
     DepartmentViewSet,
     ActivityViewSet,
     TransactionViewSet,
+    CollegeUserLoginView,
+    CollegeUserRegisterView,
+    CollegeUserLogoutView,
 )
 
 router = DefaultRouter()
@@ -20,6 +23,9 @@ class HomeView(APIView):
         return Response({
             'message': 'Welcome to College API',
             'endpoints': [
+                '/login/',
+                '/register/',
+                '/logout/',
                 '/college-users/',
                 '/departments/',
                 '/activities/',
@@ -29,4 +35,7 @@ class HomeView(APIView):
 
 urlpatterns = [
     path('', HomeView.as_view(), name="home"),
+    path('login/', CollegeUserLoginView.as_view(), name="login"),
+    path('register/', CollegeUserRegisterView.as_view(), name="register"),
+    path('logout/', CollegeUserLogoutView.as_view(), name="logout"),
 ] + router.urls
