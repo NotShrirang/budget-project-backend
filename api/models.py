@@ -39,16 +39,16 @@ class Department(models.Model):
 
 class CollegeUser(AbstractBaseUser, PermissionsMixin):
     PRIVILEGE_CHOICES = (
-        ('superuser', 'Superuser'),
-        ('principal', 'Principal'),
-        ('hod', 'HOD'),
-        ('employee', 'Employee'),
+        (0, 'Superuser'),
+        (1, 'Principal'),
+        (2, 'HOD'),
+        (3, 'Employee'),
     )
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     email = models.EmailField(verbose_name="email", max_length=60, unique=True)
     username = models.CharField(max_length=255, unique=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True, related_name='users')
-    privilege = models.CharField(max_length=255, choices=PRIVILEGE_CHOICES, default='employee')
+    privilege = models.IntegerField(choices=PRIVILEGE_CHOICES, default=3)
 
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
