@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from uuid import uuid4
+from datetime import datetime
 
 class CollegeUserManager(BaseUserManager):
     def create_user(self, email, username, password=None, **extra_fields):
@@ -81,19 +82,28 @@ class Transaction(models.Model):
         ('requested', 'Requested'),
         ('pending', 'Pending'),
         ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
     )
+
+    def get_datetime():
+        return datetime.now()
+
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     title = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     activity = models.ForeignKey(Activity, on_delete=models.CASCADE, blank=True, null=True, related_name='transactions')
     user = models.ForeignKey(CollegeUser, on_delete=models.CASCADE, blank=True, null=True, related_name='transactions')
-    item = models.CharField(max_length=255, blank=True, null=True)
-    quantity = models.IntegerField(default=0)
+    item = models.TextField(blank=True, null=True)
     requested_amount = models.IntegerField(default=0)
     approved_amount = models.IntegerField(default=0)
     file = models.FileField(upload_to='uploads/', blank=True, null=True)
     status = models.CharField(max_length=255, choices=STATUS_CHOICES, default='requested')
     note = models.TextField(blank=True, null=True)
+    request_date = models.DateTimeField(auto_now_add=True, null=False, blank=False)
+    is_read_date = models.DateTimeField(blank=True, null=True)
+    approved_date = models.DateTimeField(blank=True, null=True)
+    rejected_date = models.DateTimeField(blank=True, null=True)
+    is_read = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
