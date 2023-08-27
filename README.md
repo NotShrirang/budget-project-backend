@@ -1,6 +1,6 @@
 # Budget Project Backend
 
-This is backend for the project.
+This is the backend for the project.
 <br>
 Frontend - https://github.com/NotShrirang/budget-project-frontend
 
