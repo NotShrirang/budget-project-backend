@@ -14,6 +14,8 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
+from datetime import datetime
+from django import db
 
 class CollegeUserRegisterView(APIView):
     def post(self, request):
@@ -99,6 +101,18 @@ class TransactionViewSet(ModelViewSet):
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         
+    def create(self, request, *args, **kwargs):
+        current_user = CollegeUser.objects.get(id=request.user.id)
+        activity = Activity.objects.get(id=request.data['activity'])
+        if activity.available_amount >= request.data['requested_amount']:
+            data = request.data
+            serializer = TransactionSerializer(data=data)
+            if not serializer.is_valid():
+                return Response({'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors})
+            serializer.save(user=current_user, status='requested')
+            return Response({'status': 'success', 'message': 'Transaction created', 'data': serializer.data})
+        else:
+            return Response({'status': 'failed', 'message': 'Requested amount exceeds available amount'})
 
     def update(self, request, *args, **kwargs):
         transaction = Transaction.objects.get(id=kwargs['pk'])
@@ -113,21 +127,57 @@ class TransactionViewSet(ModelViewSet):
             return Response({'status': 'success', 'data': TransactionSerializer(transaction).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+    
+    def destroy(self, request, *args, **kwargs):
+        transaction = Transaction.objects.get(id=kwargs['pk'])
+        current_user = CollegeUser.objects.get(id=request.user.id)
+        if transaction.is_read:
+            return Response({'status': 'failed', 'message': 'You cannot delete a transaction that has been read.'})
+        if current_user == transaction.user or current_user.privilege in [0, 1, 2]:
+            transaction.delete()
+            return Response({'status': 'success', 'data': 'Transaction deleted successfully'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
 
-            
-        
 
 class UpdateTransactionStatusView(APIView):
     def post(self, request, primary_key):
-        transaction = Transaction.objects.get(id=primary_key)
-        new_status = JSONParser().parse(request)['status']
-        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
-        if current_user.privilege in [0, 1, 2] and transaction.user.department == current_user.department and transaction.status in ['requested', 'pending']:
-            if new_status == 'approved':
-                transaction.status = new_status
-                transaction.save()
-                return Response({'status': 'success', 'data': TransactionSerializer(transaction).data})
+        with db.transaction.atomic():
+            transaction = Transaction.objects.get(id=primary_key)
+            new_status = JSONParser().parse(request)['status']
+            current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+            if current_user.privilege in [0, 1, 2] and transaction.user.department == current_user.department and transaction.status == 'pending':
+                if new_status == 'approved':
+                    transaction.status = new_status
+                    activity = Activity.objects.get(id=transaction.activity.id)
+                    if transaction.requested_amount <= activity.available_amount:
+                        activity.available_amount -= transaction.requested_amount
+                        activity.save()
+                        transaction.approved_amount = transaction.requested_amount
+                    else:
+                        transaction.approved_amount = activity.available_amount
+                        activity.available_amount = 0
+                        activity.save()
+                    transaction.approved_date = datetime.now()
+                    # TODO: create transaction file
+                    transaction.save()
+                    return Response({'status': 'success', 'message': 'Transaction has been approved', 'data': TransactionSerializer(transaction).data})
+                elif new_status == 'rejected':
+                    transaction.status = 'rejected'
+                    transaction.rejected_date = datetime.now()
+                    return Response({'status': 'failed', 'message': 'Transaction has been rejected'})
             else:
-                return Response({'status': 'failed', 'message': 'You can only approve a transaction'})
+                return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+
+class UpdateTransactionReadStatusView(APIView):
+    def post(self, request, primary_key):
+        transaction = Transaction.objects.get(id=primary_key)
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1, 2] and transaction.user.department == current_user.department and transaction.status == 'requested':
+            transaction.is_read = True
+            transaction.is_read_date = datetime.now()
+            transaction.status = 'pending'
+            transaction.save()
+            return Response({'status': 'success', 'message': 'Transaction has been read', 'data': TransactionSerializer(transaction).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})

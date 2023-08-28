@@ -70,6 +70,8 @@ class Activity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255, blank=True, null=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True, related_name='activities')
+    available_amount = models.IntegerField(default=0)
+    total_amount = models.IntegerField(default=0)
 
     def __str__(self):
         return self.name
