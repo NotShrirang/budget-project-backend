@@ -73,7 +73,7 @@ class ActivityViewSet(ModelViewSet):
     serializer_class = ActivitySerializer
 
 class TransactionViewSet(ModelViewSet):
-    queryset = Transaction.objects.all()
+    queryset = Transaction.objects.all().order_by('-request_date')
     serializer_class = TransactionSerializer
 
     def list(self, request, *args, **kwargs):
@@ -81,10 +81,10 @@ class TransactionViewSet(ModelViewSet):
         if current_user.privilege in [0, 1]:
             return super().list(request, *args, **kwargs)
         elif current_user.privilege == 2:
-            transactions = Transaction.objects.filter(user__department=current_user.department)
+            transactions = Transaction.objects.filter(user__department=current_user.department).order_by('-request_date')
             return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
         elif current_user.privilege == 3:
-            transactions = Transaction.objects.filter(user=current_user)
+            transactions = Transaction.objects.filter(user=current_user).order_by('-request_date')
             return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
@@ -95,10 +95,10 @@ class TransactionViewSet(ModelViewSet):
             return super().retrieve(self, request, pk)
         elif current_user.privilege == 2:
             transactions = Transaction.objects.get(id=pk, user=current_user, user__department=current_user.department)
-            return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
+            return Response({'status': 'success', 'data': TransactionSerializer(transactions).data})
         elif current_user.privilege == 3:
             transactions = Transaction.objects.get(id=pk, user=current_user)
-            return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
+            return Response({'status': 'success', 'data': TransactionSerializer(transactions).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         
