@@ -8,57 +8,49 @@ from api.serializers import (
     CollegeUserSerializer,
     DepartmentSerializer,
     ActivitySerializer,
-    TransactionSerializer
+    TransactionSerializer,
+    RegisterSerializer,
+    LoginSerializer,
+    LogoutSerializer
 )
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from rest_framework import generics, permissions
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
 from datetime import datetime
 from django import db
+from django.db.models import Q
 
-class CollegeUserRegisterView(APIView):
-    def post(self, request):
-        email = request.data.get('email')
-        department = request.data.get('department')
-        username = request.data.get('username')
-        password = request.data.get('password')
-        privilege = request.data.get('privilege')
-        is_active = request.data.get('is_active', True)
-        is_admin = request.data.get('is_admin', False)
-        is_staff = request.data.get('is_staff', False)
-        is_superuser = request.data.get('is_superuser', False)
-        user = CollegeUser.objects.filter(email=email).first()
-        if user:
-            return Response({'status': 'failed', 'data': 'Username already exists'})
-        else:
-            user = CollegeUser.objects.create(
-                email=email,
-                department=department,
-                username=username, 
-                privilege=privilege,
-                is_active=is_active,
-                is_admin=is_admin,
-                is_staff=is_staff,
-                is_superuser=is_superuser,
-                password=password
-            )
-            return Response({'status': 'success', 'data': CollegeUserSerializer(user).data})
+class CollegeUserRegisterView(generics.GenericAPIView):
+    serializer_class = RegisterSerializer
+    def post(self,request):
+        user=request.data
+        serializer = self.serializer_class(data=user)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        user_id = CollegeUser.objects.get(email=user['email']).id
+        user_data = serializer.data
+        user_data['id'] = user_id
+        return Response(user_data, status=status.HTTP_201_CREATED)
 
-class CollegeUserLoginView(APIView):
+class CollegeUserLoginView(generics.GenericAPIView):
+    serializer_class = LoginSerializer
+    def post(self,request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data,status=status.HTTP_200_OK)
+    
+class CollegeUserLogoutView(generics.GenericAPIView):
+    serializer_class = LogoutSerializer
+    permission_classes = (permissions.IsAuthenticated,)
     def post(self, request):
-        email = request.data.get('email')
-        password = request.data.get('password')
-        user = CollegeUser.objects.filter(email=email, password=password).first()
-        if user:
-            return Response({'status': 'success', 'data': CollegeUserSerializer(user).data})
-        else:
-            return Response({'status': 'failed', 'data': 'Invalid credentials'}, status=401)
-
-class CollegeUserLogoutView(APIView):
-    def post(self, request):
-        return Response({'status': 'success', 'data': 'Logged out successfully'})
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class CollegeUserViewSet(ModelViewSet):
     queryset = CollegeUser.objects.all()
@@ -81,7 +73,7 @@ class TransactionViewSet(ModelViewSet):
         if current_user.privilege in [0, 1]:
             return super().list(request, *args, **kwargs)
         elif current_user.privilege == 2:
-            transactions = Transaction.objects.filter(user=current_user, user__department=current_user.department)
+            transactions = Transaction.objects.filter(Q(user=current_user) | Q(user__department=current_user.department))
             return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
         elif current_user.privilege == 3:
             transactions = Transaction.objects.filter(user=current_user)
@@ -107,7 +99,6 @@ class TransactionViewSet(ModelViewSet):
         activity = Activity.objects.get(id=request.data['activity'])
         if activity.available_amount >= request.data['requested_amount']:
             data = request.data
-            data['status'] = 'pending'
             serializer = TransactionSerializer(data=data)
             if not serializer.is_valid():
                 return Response({'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors})
