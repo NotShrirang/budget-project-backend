@@ -81,7 +81,7 @@ class TransactionViewSet(ModelViewSet):
         if current_user.privilege in [0, 1]:
             return super().list(request, *args, **kwargs)
         elif current_user.privilege == 2:
-            transactions = Transaction.objects.filter(user=current_user, user__department=current_user.department)
+            transactions = Transaction.objects.filter(user__department=current_user.department)
             return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
         elif current_user.privilege == 3:
             transactions = Transaction.objects.filter(user=current_user)
