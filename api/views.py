@@ -14,6 +14,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
+from rest_framework.permissions import IsAuthenticated
 from datetime import datetime
 from django import db
 
@@ -53,7 +54,7 @@ class CollegeUserLoginView(APIView):
         if user:
             return Response({'status': 'success', 'data': CollegeUserSerializer(user).data})
         else:
-            return Response({'status': 'failed', 'data': 'Invalid credentials'})
+            return Response({'status': 'failed', 'data': 'Invalid credentials'}, status=401)
 
 class CollegeUserLogoutView(APIView):
     def post(self, request):
@@ -106,6 +107,7 @@ class TransactionViewSet(ModelViewSet):
         activity = Activity.objects.get(id=request.data['activity'])
         if activity.available_amount >= request.data['requested_amount']:
             data = request.data
+            data['status'] = 'pending'
             serializer = TransactionSerializer(data=data)
             if not serializer.is_valid():
                 return Response({'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors})
@@ -179,5 +181,31 @@ class UpdateTransactionReadStatusView(APIView):
             transaction.status = 'pending'
             transaction.save()
             return Response({'status': 'success', 'message': 'Transaction has been read', 'data': TransactionSerializer(transaction).data})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        
+
+class GetRequestCountView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            return Response({'status': 'success', 'data': 
+                             {"total": Transaction.objects.filter(status='requested').count(), 
+                              "pending": Transaction.objects.filter(status='pending').count(), 
+                              "approved": Transaction.objects.filter(status='approved').count(),
+                              "rejected": Transaction.objects.filter(status='rejected').count()}})
+        elif current_user.privilege == 2:
+            return Response({'status': 'success', 'data': 
+                             {"total": Transaction.objects.filter(user__department=current_user.department).count(),
+                              "pending": Transaction.objects.filter(user__department=current_user.department, status='pending').count(),
+                              "approved": Transaction.objects.filter(user__department=current_user.department, status='approved').count(),
+                              "rejected": Transaction.objects.filter(user__department=current_user.department, status='rejected').count()}})
+        elif current_user.privilege == 3:
+            return Response({'status': 'success', 'data': 
+                             {"total": Transaction.objects.filter(user=current_user).count(),
+                              "pending": Transaction.objects.filter(user=current_user, status='pending').count(),
+                              "approved": Transaction.objects.filter(user=current_user, status='approved').count(),
+                              "rejected": Transaction.objects.filter(user=current_user, status='rejected').count()}})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})

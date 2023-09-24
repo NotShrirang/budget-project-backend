@@ -1,5 +1,6 @@
 from pathlib import Path
 from dotenv import load_dotenv
+import datetime
 import os
 
 load_dotenv()
@@ -17,7 +18,10 @@ SECRET_KEY = 'django-insecure-jw^!2-ocf_*e$r0#^$s%4)%gd3os0(p(9kygyb#ea6(js8m!s1
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1"
+]
 
 
 # Application definition
@@ -32,6 +36,7 @@ INSTALLED_APPS = [
     'api',
     'rest_framework',
     'corsheaders',
+    
 ]
 
 MIDDLEWARE = [
@@ -128,3 +133,13 @@ CORS_ORIGIN_WHITELIST = [
 ]
 
 AUTH_USER_MODEL = 'api.CollegeUser'
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
+    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(days=30),
+    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=30),
+}

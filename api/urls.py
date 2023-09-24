@@ -10,6 +10,7 @@ from api.views import (
     CollegeUserLoginView,
     CollegeUserRegisterView,
     CollegeUserLogoutView,
+    GetRequestCountView,
 )
 
 router = DefaultRouter()
@@ -30,11 +31,13 @@ class HomeView(APIView):
                 '/departments/',
                 '/activities/',
                 '/transactions/',
+                '/request-count/',
             ]
         })
 
 urlpatterns = [
     path('', HomeView.as_view(), name="home"),
+    path('request-count/', GetRequestCountView.as_view(), name='request-count'),
     path('login/', CollegeUserLoginView.as_view(), name="login"),
     path('register/', CollegeUserRegisterView.as_view(), name="register"),
     path('logout/', CollegeUserLogoutView.as_view(), name="logout"),
