@@ -98,7 +98,7 @@ class Transaction(models.Model):
     item = models.TextField(blank=True, null=True)
     requested_amount = models.IntegerField(default=0)
     approved_amount = models.IntegerField(default=0)
-    file = models.FileField(upload_to='uploads/', blank=True, null=True)
+    file = models.FileField(upload_to='transactions/', blank=True, null=True)
     status = models.CharField(max_length=255, choices=STATUS_CHOICES, default='requested')
     note = models.TextField(blank=True, null=True)
     request_date = models.DateTimeField(auto_now_add=True, null=False, blank=False)
