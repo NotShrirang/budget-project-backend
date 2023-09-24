@@ -22,6 +22,22 @@ class ActivitySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class TransactionSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    userEmail = serializers.SerializerMethodField()
+    activityName = serializers.SerializerMethodField()
+    departmentName = serializers.SerializerMethodField()
     class Meta:
         model = Transaction
-        fields = '__all__'
+        fields = ['id', 'title', 'description', 'activity', 'user', 'username', 'userEmail', 'item', 'requested_amount', 'approved_amount', 'file', 'status', 'note', 'request_date', 'is_read_date', 'approved_date', 'rejected_date', 'is_read', 'activityName', 'departmentName']
+
+    def get_username(self, obj):
+        return obj.user.username
+    
+    def get_userEmail(self, obj):
+        return obj.user.email
+    
+    def get_activityName(self, obj):
+        return obj.activity.name
+    
+    def get_departmentName(self, obj):
+        return obj.activity.department.name
