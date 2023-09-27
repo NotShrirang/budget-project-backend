@@ -72,6 +72,7 @@ class Activity(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True, related_name='activities')
     available_amount = models.IntegerField(default=0)
     total_amount = models.IntegerField(default=0)
+    isActive = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name

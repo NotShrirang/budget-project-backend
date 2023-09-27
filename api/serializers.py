@@ -17,9 +17,13 @@ class DepartmentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ActivitySerializer(serializers.ModelSerializer):
+    departmentName = serializers.SerializerMethodField()
     class Meta:
         model = Activity
-        fields = '__all__'
+        fields = ['id', 'name', 'department', 'departmentName', 'available_amount', 'total_amount', 'isActive']
+
+    def get_departmentName(self, obj):
+        return obj.department.name
 
 class TransactionSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()

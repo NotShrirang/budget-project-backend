@@ -72,6 +72,83 @@ class ActivityViewSet(ModelViewSet):
     queryset = Activity.objects.all()
     serializer_class = ActivitySerializer
 
+    def list(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            return super().list(request, *args, **kwargs)
+        elif current_user.privilege == 2:
+            activities = Activity.objects.filter(department=current_user.department)
+            return Response({'status': 'success', 'data': ActivitySerializer(activities, many=True).data})
+        elif current_user.privilege == 3:
+            activities = Activity.objects.filter(department=current_user.department)
+            return Response({'status': 'success', 'data': ActivitySerializer(activities, many=True).data})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        
+    def retrieve(self, request, pk):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            return super().retrieve(self, request, pk)
+        elif current_user.privilege == 2:
+            activity = Activity.objects.get(id=pk, department=current_user.department)
+            return Response({'status': 'success', 'data': ActivitySerializer(activity).data})
+        elif current_user.privilege == 3:
+            activity = Activity.objects.get(id=pk)
+            if activity.department == current_user.department:
+                return Response({'status': 'success', 'data': ActivitySerializer(activity).data})
+            else:
+                return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        
+    def create(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            return super().create(request, *args, **kwargs)
+        elif current_user.privilege == 2:
+            data = request.data
+            data['department'] = current_user.department.id
+            serializer = ActivitySerializer(data=data)
+            if not serializer.is_valid():
+                return Response({'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors})
+            serializer.save()
+            return Response({'status': 'success', 'message': 'Activity created', 'data': serializer.data})
+        elif current_user.privilege == 3:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        
+    def update(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            return super().update(request, *args, **kwargs)
+        elif current_user.privilege == 2:
+            activity = Activity.objects.get(id=kwargs['pk'], department=current_user.department)
+            activity.name = request.data['name'] if request.data['name'] else activity.name
+            activity.total_amount = request.data['total_amount'] if request.data['total_amount'] else activity.total_amount
+            activity.save()
+            return Response({'status': 'success', 'data': ActivitySerializer(activity).data})
+        elif current_user.privilege == 3:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+    
+    def destroy(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            activity = Activity.objects.get(id=kwargs['pk'])
+            activity.isActive = False
+            activity.save()
+        elif current_user.privilege == 2:
+            activity = Activity.objects.get(id=kwargs['pk'], department=current_user.department)
+            activity.isActive = False
+            activity.save()
+            return Response({'status': 'success', 'data': 'Activity deleted successfully'})
+        elif current_user.privilege == 3:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+
 class TransactionViewSet(ModelViewSet):
     queryset = Transaction.objects.all().order_by('-request_date')
     serializer_class = TransactionSerializer
