@@ -31,6 +31,7 @@ class Department(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     available_amount = models.IntegerField(default=0)
     total_amount = models.IntegerField(default=0)
+    isActive = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -48,7 +49,7 @@ class CollegeUser(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     email = models.EmailField(verbose_name="email", max_length=60, unique=True)
     username = models.CharField(max_length=255, unique=True)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True, related_name='users')
+    department = models.ForeignKey(Department, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='users')
     privilege = models.IntegerField(choices=PRIVILEGE_CHOICES, default=3)
 
     is_active = models.BooleanField(default=True)
@@ -69,7 +70,7 @@ class CollegeUser(AbstractBaseUser, PermissionsMixin):
 class Activity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255, blank=True, null=True)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True, related_name='activities')
+    department = models.ForeignKey(Department, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='activities')
     available_amount = models.IntegerField(default=0)
     total_amount = models.IntegerField(default=0)
     isActive = models.BooleanField(default=True)
@@ -94,8 +95,8 @@ class Transaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     title = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    activity = models.ForeignKey(Activity, on_delete=models.CASCADE, blank=True, null=True, related_name='transactions')
-    user = models.ForeignKey(CollegeUser, on_delete=models.CASCADE, blank=True, null=True, related_name='transactions')
+    activity = models.ForeignKey(Activity, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='transactions')
+    user = models.ForeignKey(CollegeUser, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='transactions')
     item = models.TextField(blank=True, null=True)
     requested_amount = models.IntegerField(default=0)
     approved_amount = models.IntegerField(default=0)
@@ -107,6 +108,7 @@ class Transaction(models.Model):
     approved_date = models.DateTimeField(blank=True, null=True)
     rejected_date = models.DateTimeField(blank=True, null=True)
     is_read = models.BooleanField(default=False)
+    isActive = models.BooleanField(default=True)
 
     def __str__(self):
         return self.title

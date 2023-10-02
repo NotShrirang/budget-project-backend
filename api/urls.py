@@ -10,6 +10,8 @@ from api.views import (
     CollegeUserLoginView,
     CollegeUserRegisterView,
     CollegeUserLogoutView,
+    UpdateTransactionStatusView,
+    UpdateTransactionReadStatusView,
     GetRequestCountView,
 )
 
@@ -32,12 +34,16 @@ class HomeView(APIView):
                 '/activities/',
                 '/transactions/',
                 '/request-count/',
+                '/update-status-transactions/<int:pk>/',
+                '/update-read-status-transactions/<int:pk>/',
             ]
         })
 
 urlpatterns = [
     path('', HomeView.as_view(), name="home"),
     path('request-count/', GetRequestCountView.as_view(), name='request-count'),
+    path('update-status-transactions/<str:pk>/', UpdateTransactionStatusView.as_view(), name='update-transaction-status'),
+    path('update-read-status-transactions/<str:pk>/', UpdateTransactionReadStatusView.as_view(), name='update-transaction-read-status'),
     path('login/', CollegeUserLoginView.as_view(), name="login"),
     path('register/', CollegeUserRegisterView.as_view(), name="register"),
     path('logout/', CollegeUserLogoutView.as_view(), name="logout"),

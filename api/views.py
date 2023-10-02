@@ -64,9 +64,47 @@ class CollegeUserViewSet(ModelViewSet):
     queryset = CollegeUser.objects.all()
     serializer_class = CollegeUserSerializer
 
+    def destroy(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1, 2]:
+            user = CollegeUser.objects.get(id=kwargs['pk'])
+            user.isActive = False
+            user.save()
+            return Response({'status': 'success', 'data': 'User deleted successfully'})
+
 class DepartmentViewSet(ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
+
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    def retrieve(self, request, pk):
+        return super().retrieve(request, pk)
+    
+    def create(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            return super().create(request, *args, **kwargs)
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        
+    def update(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            return super().update(request, *args, **kwargs)
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+    
+    def destroy(self, request, *args, **kwargs):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            department = Department.objects.get(id=kwargs['pk'])
+            department.isActive = False
+            department.save()
+            return Response({'status': 'success', 'data': 'Department deleted successfully'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
 
 class ActivityViewSet(ModelViewSet):
     queryset = Activity.objects.all()
@@ -169,13 +207,20 @@ class TransactionViewSet(ModelViewSet):
     def retrieve(self, request, pk):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
-            return super().retrieve(self, request, pk)
+            transactions = Transaction.objects.get(id=pk)
+            return Response({'status': 'success', 'data': TransactionSerializer(transactions).data})
         elif current_user.privilege == 2:
-            transactions = Transaction.objects.get(id=pk, user=current_user, user__department=current_user.department)
-            return Response({'status': 'success', 'data': TransactionSerializer(transactions).data})
+            transactions = Transaction.objects.get(id=pk)
+            if transactions.user.department == current_user.department:
+                return Response({'status': 'success', 'data': TransactionSerializer(transactions).data})
+            else:
+                return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         elif current_user.privilege == 3:
-            transactions = Transaction.objects.get(id=pk, user=current_user)
-            return Response({'status': 'success', 'data': TransactionSerializer(transactions).data})
+            transactions = Transaction.objects.get(id=pk)
+            if transactions.user == current_user:
+                return Response({'status': 'success', 'data': TransactionSerializer(transactions).data})
+            else:
+                return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         
@@ -213,16 +258,18 @@ class TransactionViewSet(ModelViewSet):
         if transaction.is_read:
             return Response({'status': 'failed', 'message': 'You cannot delete a transaction that has been read.'})
         if current_user == transaction.user or current_user.privilege in [0, 1, 2]:
-            transaction.delete()
+            transaction.isActive = False
+            transaction.save()
             return Response({'status': 'success', 'data': 'Transaction deleted successfully'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
 
 
 class UpdateTransactionStatusView(APIView):
-    def post(self, request, primary_key):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, pk):
         with db.transaction.atomic():
-            transaction = Transaction.objects.get(id=primary_key)
+            transaction = Transaction.objects.get(id=pk)
             new_status = JSONParser().parse(request)['status']
             current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
             if current_user.privilege in [0, 1, 2] and transaction.user.department == current_user.department and transaction.status == 'pending':
@@ -244,13 +291,15 @@ class UpdateTransactionStatusView(APIView):
                 elif new_status == 'rejected':
                     transaction.status = 'rejected'
                     transaction.rejected_date = datetime.now()
+                    transaction.save()
                     return Response({'status': 'failed', 'message': 'Transaction has been rejected'})
             else:
                 return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
 
 class UpdateTransactionReadStatusView(APIView):
-    def post(self, request, primary_key):
-        transaction = Transaction.objects.get(id=primary_key)
+    permission_classes = [IsAuthenticated]
+    def get(self, request, pk):
+        transaction = Transaction.objects.get(id=pk)
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1, 2] and transaction.user.department == current_user.department and transaction.status == 'requested':
             transaction.is_read = True
