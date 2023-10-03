@@ -6,6 +6,7 @@ from api.models import (
     Department,
     Transaction,
     Activity,
+    Notification,
 )
 
 admin.site.site_header = 'Budget Project Admin'
@@ -49,3 +50,4 @@ admin.site.register(CollegeUser, CollegeUserAdmin)
 admin.site.register(Department)
 admin.site.register(Transaction)
 admin.site.register(Activity)
+admin.site.register(Notification)

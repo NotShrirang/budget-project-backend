@@ -77,10 +77,30 @@ class DepartmentViewSet(ModelViewSet):
     serializer_class = DepartmentSerializer
 
     def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            departments = Department.objects.all()
+            return Response({'status': 'success', 'data': DepartmentSerializer(departments, many=True).data})
+        elif current_user.privilege in [2, 3]:
+            departments = Department.objects.filter(id=current_user.department.id)
+            return Response({'status': 'success', 'data': DepartmentSerializer(departments, many=True).data})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
     
     def retrieve(self, request, pk):
-        return super().retrieve(request, pk)
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            department = Department.objects.get(id=pk)
+            return Response({'status': 'success', 'data': DepartmentSerializer(department).data})
+        elif current_user.privilege in [2, 3]:
+            department = Department.objects.get(id=pk)
+            if department == current_user.department:
+                return Response({'status': 'success', 'data': DepartmentSerializer(department).data})
+            else:
+                return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+
     
     def create(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
@@ -113,7 +133,8 @@ class ActivityViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
-            return super().list(request, *args, **kwargs)
+            activities = Activity.objects.all()
+            return Response({'status': 'success', 'data': ActivitySerializer(activities, many=True).data})
         elif current_user.privilege == 2:
             activities = Activity.objects.filter(department=current_user.department)
             return Response({'status': 'success', 'data': ActivitySerializer(activities, many=True).data})
@@ -126,7 +147,8 @@ class ActivityViewSet(ModelViewSet):
     def retrieve(self, request, pk):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
-            return super().retrieve(self, request, pk)
+            activity = Activity.objects.get(id=pk)
+            return Response({'status': 'success', 'data': ActivitySerializer(activity).data})
         elif current_user.privilege == 2:
             activity = Activity.objects.get(id=pk, department=current_user.department)
             return Response({'status': 'success', 'data': ActivitySerializer(activity).data})
@@ -144,13 +166,20 @@ class ActivityViewSet(ModelViewSet):
         if current_user.privilege in [0, 1]:
             return super().create(request, *args, **kwargs)
         elif current_user.privilege == 2:
-            data = request.data
-            data['department'] = current_user.department.id
-            serializer = ActivitySerializer(data=data)
-            if not serializer.is_valid():
-                return Response({'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors})
-            serializer.save()
-            return Response({'status': 'success', 'message': 'Activity created', 'data': serializer.data})
+            with db.transaction.atomic():
+                data = request.data
+                data['department'] = current_user.department.id
+                department = Department.objects.get(id=current_user.department.id)
+                total_amount = data['total_amount']
+                if total_amount > department.available_amount:
+                    return Response({'status': 'failed', 'message': 'Total amount exceeds available amount!'}, status=400)
+                department.available_amount -= total_amount
+                department.save()
+                serializer = ActivitySerializer(data=data)
+                if not serializer.is_valid():
+                    return Response({'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors})
+                serializer.save()
+                return Response({'status': 'success', 'message': 'Activity created', 'data': serializer.data})
         elif current_user.privilege == 3:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
@@ -161,11 +190,15 @@ class ActivityViewSet(ModelViewSet):
         if current_user.privilege in [0, 1]:
             return super().update(request, *args, **kwargs)
         elif current_user.privilege == 2:
-            activity = Activity.objects.get(id=kwargs['pk'], department=current_user.department)
-            activity.name = request.data['name'] if request.data['name'] else activity.name
-            activity.total_amount = request.data['total_amount'] if request.data['total_amount'] else activity.total_amount
-            activity.save()
-            return Response({'status': 'success', 'data': ActivitySerializer(activity).data})
+            with db.transaction.atomic():
+                activity = Activity.objects.get(id=kwargs['pk'], department=current_user.department)
+                total_amount = request.data['total_amount']
+                if total_amount > activity.department.available_amount:
+                    return Response({'status': 'failed', 'message': 'Total amount exceeds available amount!'}, status=400)
+                activity.name = request.data['name'] if request.data['name'] else activity.name
+                activity.total_amount = request.data['total_amount'] if request.data['total_amount'] else activity.total_amount
+                activity.save()
+                return Response({'status': 'success', 'data': ActivitySerializer(activity).data})
         elif current_user.privilege == 3:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
@@ -194,7 +227,8 @@ class TransactionViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
-            return super().list(request, *args, **kwargs)
+            transactions = Transaction.objects.all().order_by('-request_date')
+            return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
         elif current_user.privilege == 2:
             transactions = Transaction.objects.filter(user__department=current_user.department).order_by('-request_date')
             return Response({'status': 'success', 'data': TransactionSerializer(transactions, many=True).data})
@@ -236,13 +270,13 @@ class TransactionViewSet(ModelViewSet):
             serializer.save(user=current_user, status='requested')
             return Response({'status': 'success', 'message': 'Transaction created', 'data': serializer.data})
         else:
-            return Response({'status': 'failed', 'message': 'Requested amount exceeds available amount'})
+            return Response({'status': 'failed', 'message': 'Requested amount exceeds available amount!'})
 
     def update(self, request, *args, **kwargs):
         transaction = Transaction.objects.get(id=kwargs['pk'])
         current_user = CollegeUser.objects.get(id=request.user.id)
         if transaction.is_read:
-            return Response({'status': 'failed', 'message': 'You cannot edit a transaction that has been read.'})
+            return Response({'status': 'failed', 'message': 'You cannot edit a transaction that has been read by HoD or Principal.'})
         if current_user == transaction.user:
             transaction.requested_amount = request.data['requested_amount'] if request.data['requested_amount'] else transaction.requested_amount
             transaction.description = request.data['description'] if request.data['description'] else transaction.description
@@ -250,19 +284,19 @@ class TransactionViewSet(ModelViewSet):
             transaction.save()
             return Response({'status': 'success', 'data': TransactionSerializer(transaction).data})
         else:
-            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})
     
     def destroy(self, request, *args, **kwargs):
         transaction = Transaction.objects.get(id=kwargs['pk'])
         current_user = CollegeUser.objects.get(id=request.user.id)
         if transaction.is_read:
-            return Response({'status': 'failed', 'message': 'You cannot delete a transaction that has been read.'})
+            return Response({'status': 'failed', 'message': 'You cannot delete a transaction that has been read by HoD or Principal.'})
         if current_user == transaction.user or current_user.privilege in [0, 1, 2]:
             transaction.isActive = False
             transaction.save()
-            return Response({'status': 'success', 'data': 'Transaction deleted successfully'})
+            return Response({'status': 'success', 'data': 'Transaction deleted successfully!'})
         else:
-            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})
 
 
 class UpdateTransactionStatusView(APIView):
@@ -287,14 +321,14 @@ class UpdateTransactionStatusView(APIView):
                     transaction.approved_date = datetime.now()
                     # TODO: create transaction file
                     transaction.save()
-                    return Response({'status': 'success', 'message': 'Transaction has been approved', 'data': TransactionSerializer(transaction).data})
+                    return Response({'status': 'success', 'message': 'Transaction has been approved!', 'data': TransactionSerializer(transaction).data})
                 elif new_status == 'rejected':
                     transaction.status = 'rejected'
                     transaction.rejected_date = datetime.now()
                     transaction.save()
-                    return Response({'status': 'failed', 'message': 'Transaction has been rejected'})
+                    return Response({'status': 'failed', 'message': 'Transaction has been rejected!'})
             else:
-                return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+                return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})
 
 class UpdateTransactionReadStatusView(APIView):
     permission_classes = [IsAuthenticated]
@@ -306,9 +340,9 @@ class UpdateTransactionReadStatusView(APIView):
             transaction.is_read_date = datetime.now()
             transaction.status = 'pending'
             transaction.save()
-            return Response({'status': 'success', 'message': 'Transaction has been read', 'data': TransactionSerializer(transaction).data})
+            return Response({'status': 'success', 'message': 'Transaction has been read!', 'data': TransactionSerializer(transaction).data})
         else:
-            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})
         
 
 class GetRequestCountView(APIView):
@@ -317,20 +351,20 @@ class GetRequestCountView(APIView):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
             return Response({'status': 'success', 'data': 
-                             {"total": Transaction.objects.filter(status='requested').count(), 
-                              "pending": Transaction.objects.filter(status='pending').count(), 
+                             {"total": Transaction.objects.all().count(), 
+                              "pending": Transaction.objects.filter(status__in=['requested', 'pending']).count(), 
                               "approved": Transaction.objects.filter(status='approved').count(),
                               "rejected": Transaction.objects.filter(status='rejected').count()}})
         elif current_user.privilege == 2:
             return Response({'status': 'success', 'data': 
                              {"total": Transaction.objects.filter(user__department=current_user.department).count(),
-                              "pending": Transaction.objects.filter(user__department=current_user.department, status='pending').count(),
+                              "pending": Transaction.objects.filter(user__department=current_user.department, status__in=['requested', 'pending']).count(),
                               "approved": Transaction.objects.filter(user__department=current_user.department, status='approved').count(),
                               "rejected": Transaction.objects.filter(user__department=current_user.department, status='rejected').count()}})
         elif current_user.privilege == 3:
             return Response({'status': 'success', 'data': 
                              {"total": Transaction.objects.filter(user=current_user).count(),
-                              "pending": Transaction.objects.filter(user=current_user, status='pending').count(),
+                              "pending": Transaction.objects.filter(user=current_user, status__in=['requested', 'pending']).count(),
                               "approved": Transaction.objects.filter(user=current_user, status='approved').count(),
                               "rejected": Transaction.objects.filter(user=current_user, status='rejected').count()}})
         else:

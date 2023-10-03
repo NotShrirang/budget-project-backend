@@ -33,11 +33,20 @@ class Department(models.Model):
     total_amount = models.IntegerField(default=0)
     isActive = models.BooleanField(default=True)
 
+    class Meta:
+        db_table = 'department'
+
     def __str__(self):
         return self.name
     
-    class Meta:
-        db_table = 'department'
+    def save(self, *args, **kwargs):
+        if self.id is None:
+            self.available_amount = self.total_amount
+        else:
+            if self.total_amount < self.available_amount:
+                raise ValueError("Total amount cannot be less than available amount")
+        super(Department, self).save(*args, **kwargs)
+    
 
 class CollegeUser(AbstractBaseUser, PermissionsMixin):
     PRIVILEGE_CHOICES = (
@@ -75,11 +84,19 @@ class Activity(models.Model):
     total_amount = models.IntegerField(default=0)
     isActive = models.BooleanField(default=True)
 
-    def __str__(self):
-        return self.name
-    
     class Meta:
         db_table = 'activity'
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if self.id is None:
+            self.available_amount = self.total_amount
+        else:
+            if self.total_amount < self.available_amount:
+                raise ValueError("Total amount cannot be less than available amount")
+        super(Activity, self).save(*args, **kwargs)
 
 class Transaction(models.Model):
     STATUS_CHOICES = (
@@ -110,8 +127,45 @@ class Transaction(models.Model):
     is_read = models.BooleanField(default=False)
     isActive = models.BooleanField(default=True)
 
+    class Meta:
+        db_table = 'transaction'
+
+    def __str__(self):
+        return self.title
+    
+    def save(self, *args, **kwargs):
+        if self.id is None:
+            Notification.objects.create(
+                user=CollegeUser.objects.get(privilege=2, department=self.activity.department),
+                transaction=self,
+                title=f"New transaction request for {self.title}",
+                body=f"{self.user.username} has requested ₹{self.requested_amount} for {self.activity.name} activity.",
+                type='transaction',
+                redirect_url=f"/transactions/{self.id}"
+            )
+        super(Transaction, self).save(*args, **kwargs)
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPE_CHOICES = (
+        ('transaction', 'Transaction'),
+        ('activity', 'Activity'),
+        ('department', 'Department'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    user = models.ForeignKey(CollegeUser, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='notifications')
+    transaction = models.ForeignKey(Transaction, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='notifications')
+    title = models.CharField(max_length=255, blank=True, null=True)
+    body = models.TextField(blank=True, null=True)
+    type = models.CharField(max_length=255, blank=True, null=True)
+    redirect_url = models.CharField(max_length=255, blank=True, null=True)
+    is_read = models.BooleanField(default=False)
+    createdAt = models.DateTimeField(auto_now_add=True, null=False, blank=False)
+    isActive = models.BooleanField(default=True)
+
     def __str__(self):
         return self.title
     
     class Meta:
-        db_table = 'transaction'
+        db_table = 'notification'

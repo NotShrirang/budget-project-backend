@@ -45,3 +45,17 @@ class TransactionSerializer(serializers.ModelSerializer):
     
     def get_departmentName(self, obj):
         return obj.activity.department.name
+    
+
+class NotificationSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    userEmail = serializers.SerializerMethodField()
+    class Meta:
+        model = Transaction
+        fields = ['id', 'title', 'description', 'activity', 'user', 'username', 'userEmail', 'item', 'requested_amount', 'approved_amount', 'file', 'status', 'note', 'request_date', 'is_read_date', 'approved_date', 'rejected_date', 'is_read']
+
+    def get_username(self, obj):
+        return obj.user.username
+    
+    def get_userEmail(self, obj):
+        return obj.user.email
