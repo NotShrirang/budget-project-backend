@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from datetime import datetime
 from django import db
 
+
 class CollegeUserRegisterView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -46,6 +47,7 @@ class CollegeUserRegisterView(APIView):
             )
             return Response({'status': 'success', 'data': CollegeUserSerializer(user).data})
 
+
 class CollegeUserLoginView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -56,9 +58,11 @@ class CollegeUserLoginView(APIView):
         else:
             return Response({'status': 'failed', 'data': 'Invalid credentials'}, status=401)
 
+
 class CollegeUserLogoutView(APIView):
     def post(self, request):
         return Response({'status': 'success', 'data': 'Logged out successfully'})
+
 
 class CollegeUserViewSet(ModelViewSet):
     queryset = CollegeUser.objects.all()
@@ -71,6 +75,7 @@ class CollegeUserViewSet(ModelViewSet):
             user.isActive = False
             user.save()
             return Response({'status': 'success', 'data': 'User deleted successfully'})
+
 
 class DepartmentViewSet(ModelViewSet):
     queryset = Department.objects.all()
@@ -86,7 +91,7 @@ class DepartmentViewSet(ModelViewSet):
             return Response({'status': 'success', 'data': DepartmentSerializer(departments, many=True).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-    
+
     def retrieve(self, request, pk):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
@@ -101,21 +106,20 @@ class DepartmentViewSet(ModelViewSet):
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
 
-    
     def create(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
             return super().create(request, *args, **kwargs)
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-        
+
     def update(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
             return super().update(request, *args, **kwargs)
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-    
+
     def destroy(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
@@ -125,6 +129,7 @@ class DepartmentViewSet(ModelViewSet):
             return Response({'status': 'success', 'data': 'Department deleted successfully'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+
 
 class ActivityViewSet(ModelViewSet):
     queryset = Activity.objects.all()
@@ -143,7 +148,7 @@ class ActivityViewSet(ModelViewSet):
             return Response({'status': 'success', 'data': ActivitySerializer(activities, many=True).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-        
+
     def retrieve(self, request, pk):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
@@ -160,7 +165,7 @@ class ActivityViewSet(ModelViewSet):
                 return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-        
+
     def create(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
@@ -184,7 +189,7 @@ class ActivityViewSet(ModelViewSet):
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-        
+
     def update(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
@@ -192,9 +197,20 @@ class ActivityViewSet(ModelViewSet):
         elif current_user.privilege == 2:
             with db.transaction.atomic():
                 activity = Activity.objects.get(id=kwargs['pk'], department=current_user.department)
-                total_amount = request.data['total_amount']
+                total_amount = request.data['total_amount']  # new total amount
                 if total_amount > activity.department.available_amount:
                     return Response({'status': 'failed', 'message': 'Total amount exceeds available amount!'}, status=400)
+                diff_total = total_amount - activity.total_amount
+                if diff_total > 0:  # new total amount is greater than old total amount
+                    activity.department.available_amount -= diff_total  # deduct the difference from available amount
+                elif diff_total < 0:  # new total amount is less than old total amount
+                    activity.department.available_amount += abs(diff_total)
+                diff_available = request.data['available_amount'] - activity.available_amount
+                if diff_available > 0:
+                    activity.department.available_amount -= diff_available
+                elif diff_available < 0:
+                    activity.department.available_amount += abs(diff_available)
+                activity.department.save()
                 activity.name = request.data['name'] if request.data['name'] else activity.name
                 activity.total_amount = request.data['total_amount'] if request.data['total_amount'] else activity.total_amount
                 activity.save()
@@ -203,7 +219,7 @@ class ActivityViewSet(ModelViewSet):
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-    
+
     def destroy(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
@@ -212,6 +228,9 @@ class ActivityViewSet(ModelViewSet):
             activity.save()
         elif current_user.privilege == 2:
             activity = Activity.objects.get(id=kwargs['pk'], department=current_user.department)
+            activity.department.available_amount += activity.available_amount
+            activity.department.save()
+            activity.available_amount = 0
             activity.isActive = False
             activity.save()
             return Response({'status': 'success', 'data': 'Activity deleted successfully'})
@@ -219,6 +238,7 @@ class ActivityViewSet(ModelViewSet):
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+
 
 class TransactionViewSet(ModelViewSet):
     queryset = Transaction.objects.all().order_by('-request_date')
@@ -257,7 +277,7 @@ class TransactionViewSet(ModelViewSet):
                 return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
-        
+
     def create(self, request, *args, **kwargs):
         current_user = CollegeUser.objects.get(id=request.user.id)
         activity = Activity.objects.get(id=request.data['activity'])
@@ -285,7 +305,7 @@ class TransactionViewSet(ModelViewSet):
             return Response({'status': 'success', 'data': TransactionSerializer(transaction).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})
-    
+
     def destroy(self, request, *args, **kwargs):
         transaction = Transaction.objects.get(id=kwargs['pk'])
         current_user = CollegeUser.objects.get(id=request.user.id)
@@ -301,6 +321,7 @@ class TransactionViewSet(ModelViewSet):
 
 class UpdateTransactionStatusView(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request, pk):
         with db.transaction.atomic():
             transaction = Transaction.objects.get(id=pk)
@@ -330,8 +351,10 @@ class UpdateTransactionStatusView(APIView):
             else:
                 return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})
 
+
 class UpdateTransactionReadStatusView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request, pk):
         transaction = Transaction.objects.get(id=pk)
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
@@ -343,10 +366,11 @@ class UpdateTransactionReadStatusView(APIView):
             return Response({'status': 'success', 'message': 'Transaction has been read!', 'data': TransactionSerializer(transaction).data})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})
-        
+
 
 class GetRequestCountView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
         if current_user.privilege in [0, 1]:
@@ -367,5 +391,42 @@ class GetRequestCountView(APIView):
                               "pending": Transaction.objects.filter(user=current_user, status__in=['requested', 'pending']).count(),
                               "approved": Transaction.objects.filter(user=current_user, status='approved').count(),
                               "rejected": Transaction.objects.filter(user=current_user, status='rejected').count()}})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+
+
+class GetRequestByActivitiesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1]:
+            departments = Department.objects.all()
+            data = []
+            for department in departments:
+                activities = Activity.objects.filter(department=department).order_by('-total_amount').values('name', 'total_amount')
+                activity_data = {}
+                activity_data['name'] = []
+                activity_data['total_amount'] = []
+                for activity in activities:
+                    activity_data['name'].append(activity['name'])
+                    activity_data['total_amount'].append(activity['total_amount'])
+                activity_data['name'].append('Unallocated amount')
+                activity_data['total_amount'].append(department.available_amount)
+                data.append({'department': department.name, 'activities': activity_data})
+            return Response({'status': 'success', 'data': data})
+        elif current_user.privilege == 2:
+            activities = Activity.objects.filter(department=current_user.department).order_by('-total_amount').values('name', 'total_amount')
+            activity_data = {}
+            activity_data['name'] = []
+            activity_data['total_amount'] = []
+            for activity in activities:
+                activity_data['name'].append(activity['name'])
+                activity_data['total_amount'].append(activity['total_amount'])
+            activity_data['name'].append('Unallocated amount')
+            activity_data['total_amount'].append(current_user.department.available_amount)
+            return Response({'status': 'success', 'data': [{'department': current_user.department.name, 'activities': activity_data}]})
+        elif current_user.privilege == 3:            
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})

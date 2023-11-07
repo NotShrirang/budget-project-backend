@@ -13,6 +13,7 @@ from api.views import (
     UpdateTransactionStatusView,
     UpdateTransactionReadStatusView,
     GetRequestCountView,
+    GetRequestByActivitiesView
 )
 
 router = DefaultRouter()
@@ -20,6 +21,7 @@ router.register(r'college-users', CollegeUserViewSet)
 router.register(r'departments', DepartmentViewSet)
 router.register(r'activities', ActivityViewSet)
 router.register(r'transactions', TransactionViewSet)
+
 
 class HomeView(APIView):
     def get(self, request):
@@ -36,14 +38,17 @@ class HomeView(APIView):
                 '/request-count/',
                 '/update-status-transactions/<int:pk>/',
                 '/update-read-status-transactions/<int:pk>/',
+                '/request-by-activities/',
             ]
         })
+
 
 urlpatterns = [
     path('', HomeView.as_view(), name="home"),
     path('request-count/', GetRequestCountView.as_view(), name='request-count'),
     path('update-status-transactions/<str:pk>/', UpdateTransactionStatusView.as_view(), name='update-transaction-status'),
     path('update-read-status-transactions/<str:pk>/', UpdateTransactionReadStatusView.as_view(), name='update-transaction-read-status'),
+    path('request-by-activities/', GetRequestByActivitiesView.as_view(), name='request-by-activities'),
     path('login/', CollegeUserLoginView.as_view(), name="login"),
     path('register/', CollegeUserRegisterView.as_view(), name="register"),
     path('logout/', CollegeUserLogoutView.as_view(), name="logout"),

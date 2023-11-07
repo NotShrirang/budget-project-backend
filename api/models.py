@@ -4,16 +4,17 @@ from django.contrib.auth.models import PermissionsMixin
 from uuid import uuid4
 from datetime import datetime
 
+
 class CollegeUserManager(BaseUserManager):
     def create_user(self, email, username, password=None, **extra_fields):
         if not email:
             raise ValueError("Users must have email address")
         if not username:
             raise ValueError("Users must have username")
-        
+
         user = self.model(
-            email = self.normalize_email(email),
-            username = username,
+            email=self.normalize_email(email),
+            username=username,
             **extra_fields,
         )
         user.set_password(password)
@@ -25,6 +26,7 @@ class CollegeUserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         return self.create_user(email, username, password, **extra_fields)
+
 
 class Department(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -38,15 +40,29 @@ class Department(models.Model):
 
     def __str__(self):
         return self.name
-    
+
     def save(self, *args, **kwargs):
         if self.id is None:
             self.available_amount = self.total_amount
+            Notification.objects.create(
+                user=CollegeUser.objects.get(privilege=1),
+                title=f"New department {self.name} added",
+                body=f"Total amount: ₹{self.total_amount}\nAvailable amount: ₹{self.available_amount}",
+                type='department',
+                redirect_url=f"/departments/{self.id}/"
+            )
         else:
             if self.total_amount < self.available_amount:
                 raise ValueError("Total amount cannot be less than available amount")
+            Notification.objects.create(
+                user=CollegeUser.objects.get(privilege=1),
+                title=f"Department {self.name} updated",
+                body=f"Total amount: ₹{self.total_amount}\nAvailable amount: ₹{self.available_amount}",
+                type='department',
+                redirect_url=f"/departments/{self.id}/"
+            )
         super(Department, self).save(*args, **kwargs)
-    
+
 
 class CollegeUser(AbstractBaseUser, PermissionsMixin):
     PRIVILEGE_CHOICES = (
@@ -72,9 +88,10 @@ class CollegeUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
-    
+
     class Meta:
         db_table = 'college_user'
+
 
 class Activity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -93,10 +110,26 @@ class Activity(models.Model):
     def save(self, *args, **kwargs):
         if self.id is None:
             self.available_amount = self.total_amount
+            Notification.objects.create(
+                user=CollegeUser.objects.get(privilege=2, department=self.department),
+                title=f"New activity {self.name} added",
+                body=f"Total amount: ₹{self.total_amount}\nAvailable amount: ₹{self.available_amount}",
+                type='activity',
+                redirect_url=f"/activities/{self.id}/"
+            )
         else:
             if self.total_amount < self.available_amount:
                 raise ValueError("Total amount cannot be less than available amount")
+
+            Notification.objects.create(
+                user=CollegeUser.objects.get(privilege=2, department=self.department),
+                title=f"Activity {self.name} updated",
+                body=f"Total amount: ₹{self.total_amount}\nAvailable amount: ₹{self.available_amount}",
+                type='activity',
+                redirect_url=f"/activities/{self.id}/"
+            )
         super(Activity, self).save(*args, **kwargs)
+
 
 class Transaction(models.Model):
     STATUS_CHOICES = (
@@ -132,14 +165,14 @@ class Transaction(models.Model):
 
     def __str__(self):
         return self.title
-    
+
     def save(self, *args, **kwargs):
         if self.id is None:
             Notification.objects.create(
                 user=CollegeUser.objects.get(privilege=2, department=self.activity.department),
                 transaction=self,
                 title=f"New transaction request for {self.title}",
-                body=f"{self.user.username} has requested ₹{self.requested_amount} for {self.activity.name} activity.",
+                body=f"{self.user.username} has requested ₹{self.requested_amount} for {self.activity.name} (activity).",
                 type='transaction',
                 redirect_url=f"/transactions/{self.id}"
             )
@@ -166,6 +199,6 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.title
-    
+
     class Meta:
         db_table = 'notification'
