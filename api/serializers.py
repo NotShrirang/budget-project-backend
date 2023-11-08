@@ -9,9 +9,25 @@ from rest_framework import serializers
 
 
 class CollegeUserSerializer(serializers.ModelSerializer):
+    departmentName = serializers.SerializerMethodField()
+
     class Meta:
         model = CollegeUser
-        fields = '__all__'
+        fields = [
+            'id',
+            'username',
+            'email',
+            'privilege',
+            'department',
+            'departmentName',
+            'is_active',
+            'is_admin',
+            'is_staff',
+            'is_superuser'
+        ]
+
+    def get_departmentName(self, obj):
+        return obj.department.name
 
 
 class DepartmentSerializer(serializers.ModelSerializer):

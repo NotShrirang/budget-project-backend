@@ -83,8 +83,11 @@ class DepartmentViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
-        if current_user.privilege in [0, 1]:
+        if current_user.privilege == 0:
             departments = Department.objects.all()
+            return Response({'status': 'success', 'data': DepartmentSerializer(departments, many=True).data})
+        elif current_user.privilege == 1:
+            departments = Department.objects.filter(isActive=True)
             return Response({'status': 'success', 'data': DepartmentSerializer(departments, many=True).data})
         elif current_user.privilege in [2, 3]:
             departments = Department.objects.filter(id=current_user.department.id)
@@ -430,3 +433,19 @@ class GetRequestByActivitiesView(APIView):
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
         else:
             return Response({'status': 'failed', 'message': 'You are not authorized to perform this action'})
+
+
+class DownloadTransactionFileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        transaction = Transaction.objects.get(id=pk)
+        current_user: CollegeUser = CollegeUser.objects.get(id=request.user.id)
+        if current_user.privilege in [0, 1, 2] and transaction.user.department == current_user.department and transaction.status == 'approved':
+            file = transaction.file
+            if file:
+                return Response({'status': 'success', 'data': file.url})
+            else:
+                return Response({'status': 'failed', 'message': 'No file found'})
+        else:
+            return Response({'status': 'failed', 'message': 'You are not authorized to perform this action!'})

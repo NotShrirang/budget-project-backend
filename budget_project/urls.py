@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
+
 class HomeView(APIView):
     def get(self, request):
         return Response({
@@ -19,6 +20,7 @@ class HomeView(APIView):
                 "/api/transactions/",
             ]
         })
+
 
 urlpatterns = [
     path('', HomeView.as_view(), name="home"),
